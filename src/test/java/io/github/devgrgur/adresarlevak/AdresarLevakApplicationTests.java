@@ -1,4 +1,4 @@
-package io.github.devgrgur.adresar_levak;
+package io.github.devgrgur.adresarlevak;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

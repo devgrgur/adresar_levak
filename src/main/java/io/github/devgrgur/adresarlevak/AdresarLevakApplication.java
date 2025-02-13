@@ -1,4 +1,4 @@
-package io.github.devgrgur.adresar_levak;
+package io.github.devgrgur.adresarlevak;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

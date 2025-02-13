@@ -1,4 +1,4 @@
-CREATE TYPE gender_type AS ENUM ('male', 'female', 'other');
+CREATE TYPE gender_type AS ENUM ('MALE', 'FEMALE', 'OTHER');
 
 CREATE TABLE IF NOT EXISTS person
 (
