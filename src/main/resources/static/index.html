@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Adresar Levak</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
+    <script src="https://unpkg.com/vue@3"></script>
+</head>
+
+<body>
+<div id="adresarApp" class="container mt-4">
+    <h3>{{ updatingId ? "Update Person" : "Create Person" }}</h3>
+    <form @submit.prevent="handleSubmit" class="mb-4">
+        <div class="row">
+            <div class="col-6 mb-2">
+                <input v-model="form.firstName" type="text" class="form-control form-control-sm" placeholder="First Name" required>
+            </div>
+            <div class="col-6 mb-2">
+                <input v-model="form.lastName" type="text" class="form-control form-control-sm" placeholder="Last Name" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6 mb-2">
+                <input v-model="form.pin" type="text" class="form-control form-control-sm" placeholder="PIN (11 numbers)" required>
+            </div>
+            <div class="col-6 mb-2">
+                <select v-model="form.gender" class="form-control form-control-sm" required>
+                    <option value="">Select Gender</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-6 mb-2">
+                <input v-model="form.phoneNumbers" type="text" class="form-control form-control-sm" placeholder="Phone Numbers (10 numbers) (Use , to seperate)">
+            </div>
+            <div class="col-6 mb-2">
+                <input v-model="form.emailAddresses" type="text" class="form-control form-control-sm" placeholder="Email addresses (Use , to seperate)">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success btn-sm">{{ updatingId ? "Update" : "Create" }}</button>
+        <button v-if="updatingId" type="button" @click="cancelPersonUpdate" class="btn btn-secondary btn-sm ml-2">Cancel</button>
+    </form>
+
+    <h3>Search / Filter by gender</h3>
+    <form @submit.prevent="queryPeopleBySearchString" class="mb-2">
+        <div class="row">
+            <div class="col-8 mb-2">
+                <input v-model="searchQuery" type="text" class="form-control form-control-sm" placeholder="Search by first, last name & PIN">
+            </div>
+            <div class="col-4 mb-2">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+            </div>
+        </div>
+    </form>
+    <div class="row">
+        <div class="col-4 mb-2">
+            <select v-model="filteredGender" @change="filterPeopleByGender" class="form-control form-control-sm">
+                <option value="">All Genders</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="OTHER">Other</option>
+            </select>
+        </div>
+    </div>
+
+    <h3>People</h3>
+    <table v-if="fetchedPeople.length" class="table table-bordered">
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>First name</th>
+            <th>Last name</th>
+            <th>PIN</th>
+            <th>Gender</th>
+            <th>Phone numbers</th>
+            <th>Email addresses</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="p in fetchedPeople" :key="p.id">
+            <td>{{ p.id }}</td>
+            <td>{{ p.firstName }}</td>
+            <td>{{ p.lastName }}</td>
+            <td>{{ p.pin }}</td>
+            <td>{{ p.gender }}</td>
+            <td>{{ p.phoneNumbers.map(pn => pn.phoneNumber).join(", ") }}</td>
+            <td>{{ p.emailAddresses.map(ea => ea.emailAddress).join(", ") }}</td>
+            <td>
+                <button @click="handlePersonUpdate(p)" class="btn btn-warning btn-sm mr-1">Update Person</button>
+                <button @click="deletePerson(p.id)" class="btn btn-danger btn-sm">Delete Person</button>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    <p v-else>No people.</p>
+</div>
+
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                fetchedPeople: [],
+                updatingId: null,
+                form: { firstName: "", lastName: "", pin: "", gender: "", phoneNumbers: "", emailAddresses: "" },
+                searchQuery: "",
+                filteredGender: ""
+            }
+        },
+        methods: {
+            fetchPeople() {
+                fetch("http://localhost:8080/api/person")
+                    .then(res => res.json())
+                    .then(data => this.fetchedPeople = data);
+            },
+            handleSubmit() {
+                if (!this.updatingId) {
+                    const payload = {
+                        firstName: this.form.firstName,
+                        lastName: this.form.lastName,
+                        pin: this.form.pin,
+                        gender: this.form.gender,
+                        phoneNumbers: this.form.phoneNumbers.split(",").map(s => s.trim()).filter(Boolean),
+                        emailAddresses: this.form.emailAddresses.split(",").map(s => s.trim()).filter(Boolean)
+                    };
+                    fetch("http://localhost:8080/api/person", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    })
+                        .then(() => { this.fetchPeople(); this.clearPersonForm(); });
+                } else {
+                    const personUpdateEndpoint = `http://localhost:8080/api/person/${this.updatingId}`;
+                    const personUpdatePhonesEndpoint = `http://localhost:8080/api/person/phonenumber/${this.updatingId}`;
+                    const personUpdateEmailsEndpoint = `http://localhost:8080/api/person/emailaddress/${this.updatingId}`;
+                    const upd = (url, payload) =>
+                        fetch(url, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                    Promise.all([
+                        upd(personUpdateEndpoint, { firstName: this.form.firstName, lastName: this.form.lastName, pin: this.form.pin, gender: this.form.gender }),
+                        upd(personUpdatePhonesEndpoint, { phoneNumbers: this.form.phoneNumbers.split(",").map(s => s.trim()).filter(Boolean) }),
+                        upd(personUpdateEmailsEndpoint, { emailAddresses: this.form.emailAddresses.split(",").map(s => s.trim()).filter(Boolean) })
+                    ])
+                        .then(() => { this.fetchPeople(); this.clearPersonForm(); this.updatingId = null; });
+                }
+            },
+            clearPersonForm() {
+                this.form = { firstName: "", lastName: "", pin: "", gender: "", phoneNumbers: "", emailAddresses: "" };
+            },
+            handlePersonUpdate(p) {
+                this.updatingId = p.id;
+                this.form.firstName = p.firstName;
+                this.form.lastName = p.lastName;
+                this.form.pin = p.pin;
+                this.form.gender = p.gender;
+                this.form.phoneNumbers = p.phoneNumbers.map(pn => pn.phoneNumber).join(", ");
+                this.form.emailAddresses = p.emailAddresses.map(ea => ea.emailAddress).join(", ");
+            },
+            cancelPersonUpdate() {
+                this.clearPersonForm();
+                this.updatingId = null;
+            },
+            queryPeopleBySearchString() {
+                const url = this.searchQuery.trim() === ""
+                    ? "http://localhost:8080/api/person"
+                    : "http://localhost:8080/api/person/search?searchQuery=" + encodeURIComponent(this.searchQuery);
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => this.fetchedPeople = data);
+            },
+            filterPeopleByGender() {
+                const url = this.filteredGender
+                    ? "http://localhost:8080/api/person?gender=" + encodeURIComponent(this.filteredGender)
+                    : "http://localhost:8080/api/person";
+                fetch(url)
+                    .then(res => res.json())
+                    .then(data => this.fetchedPeople = data);
+            },
+            deletePerson(id) {
+                const url = "http://localhost:8080/api/person/" + id;
+                fetch(url, { method: "DELETE" })
+                    .then(() => this.fetchedPeople = this.fetchedPeople.filter(p => p.id !== id));
+            }
+        },
+        mounted() {
+            this.fetchPeople();
+        }
+    }).mount("#adresarApp");
+</script>
+</body>
+</html>
